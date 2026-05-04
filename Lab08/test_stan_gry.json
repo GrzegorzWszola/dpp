@@ -1,0 +1,20 @@
+{
+    "size": 3,
+    "moves": [
+        {
+            "player": 1,
+            "row": 0,
+            "col": 0
+        },
+        {
+            "player": 1,
+            "row": 0,
+            "col": 0
+        },
+        {
+            "player": 2,
+            "row": 1,
+            "col": 1
+        }
+    ]
+}
