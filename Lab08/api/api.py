@@ -10,8 +10,9 @@ class API:
         self.host = host
         self.port = port
         self.debug = debug
-        self.engine = None
         self.app = Flask(__name__)
+        self.game_lists = {}
+        self.last_game_id = 0
         self._register_routes()
 
     def _register_routes(self):
@@ -20,10 +21,19 @@ class API:
         def index():
             return jsonify({"message": "API działa!", "status": "ok"})
         
-        @self.app.post("/game/start")
-        def game_start():
+        @self.app.get("/get/id")
+        def get_id():
+            self.last_game_id += 1
+            return jsonify({"id": self.last_game_id})
+        
+        @self.app.post("/game/<int:game_id>/start")
+        def game_start(game_id):
             print("/game/start")
             body = request.get_json()
+
+            if not game_id:
+                return jsonify({"status": "error", "message": "Brak game_id"}), 400
+
             player_1 = HumanPlayer(id=body["player_1"]["id"], name=body["player_1"]["name"])
             if body["player_2"]["is_ai"]:
                 player_2 = AIPlayer(id=body["player_2"]["id"], name=body["player_2"]["name"])
@@ -36,33 +46,51 @@ class API:
                 move_list = None
 
             try:
-                self.engine = Engine(player_1=player_1,
+                engine = Engine(player_1=player_1,
                                      player_2=player_2,
                                      size=body["size"],
                                      starting_player_index=body["starting_player_index"],
                                      move_list=move_list)
+                
+                self.game_lists[game_id] = engine
             except Exception:
                 return jsonify({"status": "NOK"})
 
             # Zwroc game state jezeli wszytsko jest ok
-            return jsonify(self.engine.start_game())
+            return jsonify(engine.start_game())
         
-        @self.app.post("/move")
-        def move():
+        @self.app.post("/game/delete/<int:game_id>")
+        def game_delete(game_id):
+            game = self.game_lists.pop(game_id, None)
+    
+            if game:
+                return jsonify({"status": "ok", "message": f"Gra {game_id} usunięta"})
+            return jsonify({"status": "error", "message": "Nie ma takiej gry"}), 404
+        
+        @self.app.post("/move/<int:game_id>")
+        def move(game_id):
             body = request.get_json()
             move = Move(body["player"], body["row"], body["col"])
 
             try:
-                response = self.engine.move(row=move.row, col=move.col)
+                game = self.game_lists.get(game_id)
+                if not game:
+                    raise Exception
+                
+                response = game.move(row=move.row, col=move.col)
             except Exception:
                 return jsonify({"status": "NOK"})
             
             return jsonify(response)
         
-        @self.app.post("/move/ai")
-        def move_ai():
+        @self.app.post("/move/<int:game_id>/ai")
+        def move_ai(game_id):
             try:
-                response = self.engine.move()
+                game = self.game_lists.get(game_id)
+                if not game:
+                    raise Exception
+                
+                response = game.move()
             except Exception:
                 return jsonify({"status": "NOK"})
             

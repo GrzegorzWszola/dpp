@@ -1,0 +1,7 @@
+{
+    "size": 3,
+    "moves": [
+        {"player": 1, "row": 0, "col": 0},
+        {"player": 2, "row": 2, "col": 2}
+    ]
+}

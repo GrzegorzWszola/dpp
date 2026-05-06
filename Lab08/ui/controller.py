@@ -22,6 +22,7 @@ class MyWindow(QMainWindow):
         self.size = 0
         self._connect_buttons()
         self.ui.radioPlayer1.setChecked(True)
+        self.game_id = -1
 
     def _connect_buttons(self):
         self.ui.startButton.clicked.connect(self.on_start)
@@ -30,6 +31,16 @@ class MyWindow(QMainWindow):
         self.ui.resetButton.clicked.connect(self.reset)
 
     def on_start(self):
+        if self.game_id != -1:
+            response = requests.post(
+                f"http://{self.api_host}:{self.api_port}/game/delete/{self.game_id}"
+            ).json()
+
+        response = requests.get(
+            f"http://{self.api_host}:{self.api_port}/get/id"
+        ).json()
+        self.game_id = response["id"]
+
         self.game_ui.view.setEnabled(True)
         player_1_name = self.ui.nameInput1.text()
         player_2_name = self.ui.nameInput2.text()
@@ -60,7 +71,7 @@ class MyWindow(QMainWindow):
             "move_list": [asdict(move) for move in move_list] if move_list else []
         }
         response = requests.post(
-            f"http://{self.api_host}:{self.api_port}/game/start",
+            f"http://{self.api_host}:{self.api_port}/game/{self.game_id}/start",
             json=loaded_game_state
         ).json()
         
@@ -99,14 +110,14 @@ class MyWindow(QMainWindow):
     def on_cell_clicked(self, row, col):
         try:
             result_dict = requests.post(
-                f"http://{self.api_host}:{self.api_port}/move",
+                f"http://{self.api_host}:{self.api_port}/move/{self.game_id}",
                 json=asdict(MoveDTO(self.game.current_player.id, row, col))
             )
             self.update_game_state(result_dict.json())
 
             while self.game.winner is None and self.game.current_player.is_ai:
                 result_ai = requests.post(
-                    f"http://{self.api_host}:{self.api_port}/move/ai"
+                    f"http://{self.api_host}:{self.api_port}/move/{self.game_id}/ai"
                 )
                 self.update_game_state(result_ai.json())
                 QApplication.processEvents()
@@ -140,6 +151,10 @@ class MyWindow(QMainWindow):
         self.game_ui.update_board(self.game.matrix)
         if self.game.winner is not None:
             QMessageBox.information(self, "Koniec gry", f"Wygrał gracz: {self.game.winner.name} (ID: {self.game.winner.id})")
+            requests.post(
+                f"http://{self.api_host}:{self.api_port}/game/delete/{self.game_id}"
+            )
+            self.game_id = -1
             self.game_ui.view.setEnabled(False)
 
     def save_state(self):
